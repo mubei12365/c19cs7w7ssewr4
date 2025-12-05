@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
     const path = location.pathname.toLowerCase();
 
-    // 主页购买
     if (path.endsWith("index.html") || path === "/" || path === "") {
         sessionStorage.clear();
         localStorage.removeItem("paymentConfirmed");
@@ -11,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
             btn.onclick = function () {
                 const card = this.closest(".card");
                 const name = card.dataset.name;
-                const price = parseFloat(card.dataset.price);
+                price = parseFloat(card.dataset.price);
 
                 sessionStorage.setItem("order", JSON.stringify({ name, price }));
                 location.href = "confirm.html";
@@ -19,7 +18,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // ==================== 确认订单页（最低20USDT + 1USDT=2USD + 完全支持浮点） ====================
     else if (path.includes("confirm.html")) {
         const order = JSON.parse(sessionStorage.getItem("order"));
         if (!order) { alert("No order found!"); location.href = "index.html"; return; }
@@ -32,26 +30,22 @@ document.addEventListener("DOMContentLoaded", function () {
         const payUSDT = document.getElementById("payUSDT");
         const payBtn = document.getElementById("payNow");
 
-               const calc = () => {
+        const calc = () => {
             let qty = parseFloat(amountInput.value) || 0;
             if (qty <= 0) qty = 0;
-
-            // 熊猫币限购100
             if (order.name === "PANDA") qty = Math.min(qty, 1000);
             amountInput.value = qty.toFixed(8).replace(/\.?0+$/, "");
 
-            const usdValue = qty * order.price;           // 原始美元价值
-            const needUSDT = usdValue / 3;                 // 全球统一：1 USDT = 2 USD（熊猫币也打五折！）
+            const usdValue = qty * order.price;
+            const needUSDT = usdValue / 3;
 
             totalUSD.textContent = usdValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8});
             payUSDT.textContent = needUSDT.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8}) + " USDT";
 
-            // 最低 20 USDT
             payBtn.disabled = needUSDT < 100;
-            payBtn.style.opacity = needUSDT < 20 ? "0.5" : "1";
+            payBtn.style.opacity = needUSDT < 100 ? "0.5" : "1";
         };
 
-   
         document.getElementById("plus").onclick = () => {
             amountInput.value = (parseFloat(amountInput.value || 0) + 0.01).toFixed(8);
             calc();
@@ -63,7 +57,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         };
 
-        // 输入框支持任意浮点数
         amountInput.oninput = () => {
             let val = amountInput.value.replace(/[^0-9.]/g, '');
             const parts = val.split('.');
@@ -72,29 +65,30 @@ document.addEventListener("DOMContentLoaded", function () {
             calc();
         };
 
-        calc(); // 初始化
+        calc();
 
         payBtn.onclick = () => {
             const wallet = document.getElementById("wallet").value.trim();
             if (!wallet) return alert("Please enter the wallet address!");
-            if (!/^0x[a-fA-F0-9]{40}$/i.test(wallet)) return alert("Wallet address format is incorrect！");
+            if (!/^0x[a-fA-F0-9]{40}$/i.test(wallet)) return alert("Wallet address format is incorrect!");
 
             sessionStorage.setItem("payAmount", payUSDT.textContent);
             location.href = "payment.html";
         };
     }
 
-    // ==================== 支付页（二维码100%显示 + 币安实测可用） ====================
     else if (path.includes("payment.html")) {
         const amountText = sessionStorage.getItem("payAmount");
         if (!amountText) { location.href = "index.html"; return; }
 
         document.getElementById("usdtAmount").textContent = amountText;
 
-        // 币安最稳的纯地址二维码
-        const address = "0xe5eEE64A2e316Ef7939b8eBE30d9Ecd8E4d7E845";
+        const usdtRaw = Math.round(parseFloat(amountText) * 1000000);
+
+        const paymentUri = `ethereum:0xdac17f958d2ee523a2206206994597c13d831ec7@1/transfer?address=0xe5eEE64A2e316Ef7939b8eBE30d9Ecd8E4d7E845&uint256=${usdtRaw}`;
+
         new QRCode(document.getElementById("qrcode"), {
-            text: address,
+            text: paymentUri,
             width: 280,
             height: 280,
             colorDark: "#000000",
@@ -102,13 +96,10 @@ document.addEventListener("DOMContentLoaded", function () {
             correctLevel: QRCode.CorrectLevel.H
         });
 
-        // 币安专属贴心提示
         const tip = document.createElement("p");
-        tip.innerHTML = `<strong style="color:#00ff9d">After scanning the Binance QR code:</strong><br> 
-Select USDT (ERC20 network) → Paste the address → Enter<b>${amountText}</b> → Confirm payment`;
-        tip.style.margin = "1.5rem 0";
-        tip.style.lineHeight = "1.8";
-        tip.style.fontSize = "1.1rem";
+        tip.innerHTML = `<strong style="color:#00ff9d">扫码自动填写金额</strong><br>支持币安 / OKX / imToken / MetaMask / TrustWallet`;
+        tip.style.marginTop = "1.5rem";
+        tip.style.color = "#79c879";
         document.querySelector(".payment-box.glass").insertBefore(tip, document.getElementById("paid"));
 
         document.getElementById("paid").onclick = () => {
@@ -118,7 +109,6 @@ Select USDT (ERC20 network) → Paste the address → Enter<b>${amountText}</b> 
         };
     }
 
-    // ==================== 成功页（保持不变） ====================
     else if (path.includes("success.html")) {
         if (localStorage.getItem("paymentConfirmed") !== "true") {
             alert("Access denied!");
